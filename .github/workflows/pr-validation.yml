@@ -1,0 +1,62 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [main, master]
+  push:
+    branches: [main, master]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install lint and test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff pytest
+
+      - name: Lint with Ruff
+        run: ruff check core tools --output-format=github
+
+      - name: Run unit tests
+        run: |
+          if [ -d tools/defense/prompt-guard/tests ]; then
+            pip install -e "tools/defense/prompt-guard[dev]"
+            pytest tools/defense/prompt-guard/tests -q --tb=short
+          fi
+          if [ -d tools/auditing/supply-chain-scanner/tests ]; then
+            pip install -e "tools/auditing/supply-chain-scanner[dev]"
+            pytest tools/auditing/supply-chain-scanner/tests -q --tb=short
+          fi
+          if [ -d tools/evaluation/rag-audit-engine/tests ]; then
+            pip install -e "tools/evaluation/rag-audit-engine[dev]"
+            pytest tools/evaluation/rag-audit-engine/tests -q --tb=short
+          fi
+          python -m compileall -q core tools
+
+      - name: Supply-chain audit (fail on high+)
+        run: |
+          pip install -e tools/auditing/supply-chain-scanner
+          supply-chain-scan --discover --root . --fail-on high -f human -q
+
+      - name: RAG audit fixture check
+        run: |
+          pip install -e tools/evaluation/rag-audit-engine
+          rag-audit --input tools/evaluation/rag-audit-engine/tests/fixtures/sample_batch.jsonl --fail-on none -f human -q
+
+      - name: PromptGuard fixture check
+        run: |
+          pip install -e tools/defense/prompt-guard
+          prompt-guard --input tools/defense/prompt-guard/tests/fixtures/sample_prompts.jsonl --fail-on none -f human -q

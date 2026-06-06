@@ -1,0 +1,14 @@
+[
+  {
+    "name": "insecure-package",
+    "version": "1.0.0",
+    "vulns": [
+      {
+        "id": "CVE-2024-0001",
+        "description": "Example vulnerability",
+        "aliases": ["CVE-2024-0001"],
+        "fix_versions": ["1.0.1"]
+      }
+    ]
+  }
+]
